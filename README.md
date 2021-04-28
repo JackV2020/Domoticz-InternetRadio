@@ -1,64 +1,53 @@
-This plugin is a configurable Internet Radio and is already preconfigured in internetradio.conf.
+This Domoticz plugin was developed on a Raspberry Pi and may work on other platforms also.
 
-A lot of station URLs are available on https://www.hendrikjansen.nl/henk/streaming.html
+It is a configurable Internet Radio and is already preconfigured in internetradio.conf.
 
-Many thanks to Hendrik Jansen for maintaining this list.
+The plugin can be used to play radio stations from the web browser with which you access your Domoticz.
 
-The plugin can be used to play music from the web browser with which you access your Domoticz.
-
-So music will come out of your phone, tablet, PC etc.
+So music etc. will come out of your phone, tablet, PC ....
 
 When installed on a Raspberry Pi it will also play on the (bluetooth) speaker connected to the Raspberry Pi.
 
-This plugin may ( be modified to ) work on other platforms too.
+Remember that when you use it over the internet while away from home, and you have a speaker connected to your Pi your Pi will produce the same music although you are not at home.
 
-When you have access to your Domoticz over Internet you will have your personal Internet Radio available everywhere. 
+Something I can not do with my Sonos.... 
 
-To install the plugin you need the contents of the zip file.
+Okay so now you know it is "better than Sonos" you want it, but how do you get it in place ?
+
+There are a few requirements you need to have in place first.
+
+ - Before installing make sure that the requests module is installed :
+    sudo apt-get install python3-requests
+    ( When already installed it will skip installation and explain it is already installed )
+ - to play the radio stations via the speaker of your Raspberry Pi you need mplayer
+    sudo apt install mplayer
+    ( When already installed it will skip installation and explain it is already installed )
+    When you do/can not install mplayer it wil still play radio in the browser on your phone / pc
+
+To install the plugin you need to get the contents in your plugin folder :
 
 On a Raspberry Pi you could :
 
-Start a terminal and go to your plugins folder and the next wget command will download a zip file, unpack and remove the zipfile : 
+Start a terminal and go to your plugins folder and the next will get it for you into an internetradio folder : 
 
- ....../plugins$ wget https://raw.githubusercontent.com/JackV2020/Domoticz-InternetRadio/main/internetradio.zip -O internetradio.zip && unzip -o internetradio.zip && rm internetradio.zip
+ ....../plugins$ git clone https://github.com/JackV2020/Domoticz-InternetRadio.git internetradio
 
-After this you need to do some required actions.
+later when you want to check for updates you go into the folder and issue git pull :
 
-REQUIRED ACTIONS :
+ ....../plugins/internetradio$ git pull
 
-The plugin uses 'mplayer' and so called 'passwordless ssh between root and pi'.
+An update will overwrite the configuration file internetradio.conf with a default one so make sure to have a backup of yours.
 
-Both are easy to get in place :
-( you may need to accept some things by giving right answers )
-
- - start a terminal window
- - sudo -i 
- - apt install mplayer -y
- - ssh-keygen  
-        ( 3 x enter )
- - ssh-copy-id -i ~/.ssh/id_rsa.pub pi@localhost 
-        ( answer questions to continue )
- - ssh pi@localhost amixer 
-        ( should give : Simple mixer control 'Master',0 )
- - exit
- - exit
-
-Configuring internetradio.conf is easy. Do it now or do it later.
-
- - Stations are grouped so they appear in drop down menus of selector switches.
-
- - Just add/remove/change stations and/or selector switches.
-
-Now to get it into Domoticz restart your domoticz like :
+To get it into Domoticz restart your domoticz like :
 
     sudo systemctl restart domoticz
 
 After this you can add a device of the Type 'Jacks Internet Radio'.
 
-When you do not like the Type name 'Jacks Internet Radio' feel free to edit plugin.py and modify it before you actually add your hardware.
-
 NOTES:
- - click on the link in the marquee in the last device on your Domoticz to play on your phone / laptop.
- - after changing internetradio.conf restart the plugin.
+ - After selecting a station you click on the link in the 'Actief' device to play on your phone / laptop.
+ - Configuring internetradio.conf is easy. How to is in the file itself.
+ - A lot of station URLs are available on https://www.hendrikjansen.nl/henk/streaming.html
+ - Many thanks to Hendrik Jansen for maintaining this list.
 
 Thanks for reading and enjoy.
