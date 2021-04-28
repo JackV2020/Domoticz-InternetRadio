@@ -19,7 +19,7 @@ There are a few requirements you need to have in place first.
  - Before installing make sure that the requests module is installed :
     sudo apt-get install python3-requests
     ( When already installed it will skip installation and explain it is already installed )
- - to play the radio stations via the speaker of your Raspberry Pi you need mplayer
+ - to play the radio stations via the speaker of your Raspberry Pi you need mplayer : 
     sudo apt install mplayer
     ( When already installed it will skip installation and explain it is already installed )
     When you do/can not install mplayer it wil still play radio in the browser on your phone / pc
