@@ -2,16 +2,22 @@
 # Title : Jacks Internet Radio
 # Author: Jack Veraart
 # Date  : 2021-04-15
-# 
+#     
+# Changelog :
+#
+# version 3.0.0 : Changed for new Domoticz API
+# version 2.0.0 : Added Room
+# version 1.0.0 : Initial version
+#
 """
-<plugin key="JacksInternetRadio" name="Jacks Internet Radio" author="Jack Veraart" version="2.0">
+<plugin key="JacksInternetRadio" name="Jacks Internet Radio" author="Jack Veraart" version="3.0.0">
     <description>
         <font size="4" color="white">Internet Radio</font><font color="white">...Notes...</font>
         <ul style="list-style-type:square">
             <li><font color="yellow">Requirements:</font></li>
             <li><font color="yellow"> - Install audio player mplayer : sudo apt install mplayer -y </font></li>
             <li><font color="yellow">Preconfigured radio is available in plugin folder in internetradio.conf</font></li>
-            <li><font color="yellow">When you have a Password on your domoticz and want an Internet Radio Room, enter admin Username and Password below, otherwise leave as is.</font></li>
+            <li><font color="yellow">Add Admin account details below so I can import icons and create a room.</font></li>
             <li><font color="yellow">To develop your own plugin...check this web site... <a href="https://www.domoticz.com/wiki/Developing_a_Python_plugin" ><font color="cyan">Developing_a_Python_plugin</font></a></font></li>
         </ul>
     </description>
@@ -38,10 +44,6 @@ LocalHostInfo=''
 HeartbeatInterval= 5   # 5 seconds
 
 HomeFolder=''   # plugin finds right value
-IPPort=0        # plugin finds right value
-
-Username=''     # plugin finds right value
-Password=''     # plugin finds right value
 
 DeviceLibrary={}
 
@@ -59,8 +61,6 @@ class BasePlugin:
         global StartupOK
         
         global HomeFolder
-        global Username
-        global Password
 
         global LocalHostInfo
 
@@ -83,15 +83,14 @@ class BasePlugin:
             Username        =str(Parameters["Username"])
             Password        =str(Parameters["Password"])
 
-            MyIPPort        =GetDomoticzPort()            
+            LocalHostInfo     = "https://"+Username+":"+Password+"@"+GetDomoticzIP()+":"+GetDomoticzHTTPSPort()
 
-            LocalHostInfo='http://'+Username+':'+Password+'@localhost:'+MyIPPort
-
-            ImportImages()
+            StartupOK = ImportImages()
 
 # Create devices as configured in internetradio.conf
 
-            StartupOK = CreateDevices()
+            if StartupOK == 1:
+                StartupOK = CreateDevices()
             
             if StartupOK == 1:
                 
@@ -253,39 +252,70 @@ def DumpConfigToLog():
 # ----------------------------------------------------  Image Management Routines  -----------------------------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def GetDomoticzPort():
-#
-# A friend of me runs Domoticz on a non standard port, so to make it working for him too.....
-#
-    global IPPort
-    
-    pathpart=Parameters['HomeFolder'].split('/')[3]
-    searchfile = open("/etc/init.d/"+pathpart+".sh", "r")
-    for line in searchfile:
-        if ("-www" in line) and (line[0:11]=='DAEMON_ARGS'): 
-            IPPort=str(line.split(' ')[2].split('"')[0])
-    searchfile.close()
-    Domoticz.Debug('######### GetDomoticzPort looked in: '+"/etc/init.d/"+pathpart+".sh"+' and found port: '+IPPort)
-    
-    return IPPort
-
+# --------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------  Image Management Routines  -----------------------------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def GetImageDictionary(HostInfo):
-#
-# HostInfo : http(s)://user:pwd@somehost.somewhere:port
-#
+def GetDomoticzHTTPSPort():
+
+    try:
+        import subprocess
+    except:
+        Domoticz.Log("python3 is missing module subprocess")
+
+    try:
+        import time
+    except:
+        Domoticz.Log("python3 is missing module time")
+
+    try:
+        Domoticz.Debug('GetDomoticzHTTPSPort check startup file')
+        pathpart=Parameters['HomeFolder'].split('/')[3]
+        searchfile = open("/etc/init.d/"+pathpart+".sh", "r")
+        for line in searchfile:
+            if ("-sslwww" in line) and (line[0:11]=='DAEMON_ARGS'):
+                HTTPSPort=str(line.split(' ')[2].split('"')[0])
+                HTTPSPort = HTTPSPort.replace('\\n','') # remove EOL
+        searchfile.close()
+        Domoticz.Debug('GetDomoticzHTTPSPort looked in: '+"/etc/init.d/"+pathpart+".sh"+' and found port: '+HTTPSPort)
+    except:
+        Domoticz.Debug('GetDomoticzHTTPSPort check running process')
+        command='ps -ef | grep domoticz | grep sslwww | grep -v grep | tr -s " "'
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+        timeouts=0
+
+        result = ''
+        while timeouts < 10:
+            p_status = process.wait()
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                HTTPSPort=str(output)
+                HTTPSPort = HTTPSPort[HTTPSPort.find('-sslwww'):]
+                HTTPSPort = HTTPSPort[HTTPSPort.find(' ')+1:]
+                HTTPSPort = HTTPSPort[:HTTPSPort.find(' ')]
+                HTTPSPort = HTTPSPort.replace('\\n','') # remove EOL
+            else:
+                time.sleep(0.2)
+                timeouts=timeouts+1
+        Domoticz.Log('GetDomoticzHTTPSPort looked at running process and found port: '+HTTPSPort)
+
+    return HTTPSPort
+
+# --------------------------------------------------------------------------------------------------------------------------------------------------------
+def GetImageDictionary():
+
     import json
     import requests
 
     try:
         mydict={}
 
-        url=HostInfo.split(':')[0]+'://'+HostInfo.split('@')[1]+'/json.htm?type=custom_light_icons'
-        username=HostInfo.split(':')[1][2:]
-        password=HostInfo.split(':')[2].split('@')[0]
+        url=LocalHostInfo+'/json.htm?type=command&param=custom_light_icons'
 
-        response=requests.get(url, auth=(username, password))
+        response=requests.get(url, verify=False)
         data = json.loads(response.text)
         for Item in data['result']:
             mydict[str(Item['imageSrc'])]=int(Item['idx'])
@@ -301,28 +331,52 @@ def ImportImages():
 #
 # Import ImagesToImport if not already loaded
 #
-    import glob
+    try :
+        import glob
+    except:
+        Domoticz.Log("python3 is missing module glob")
 
     global ImageDictionary
-
-    ImageDictionary=GetImageDictionary(LocalHostInfo)
+    
+    MyStatus=1
+    
+    ImageDictionary=GetImageDictionary()
     
     if ImageDictionary == {}:
-        Domoticz.Log("ERROR I can not access the image library. Please modify the hardware setup to have the right username and password.")      
+        Domoticz.Log("Please modify your setup to have Admin access. (See Hardware setup page of this plugin.)")      
+        MyStatus = 0
     else:
 
         for zipfile in glob.glob(HomeFolder+"CustomIcons/*.zip"):
             importfile=zipfile.replace(HomeFolder,'')
             try:
                 Domoticz.Image(importfile).Create()
-                Domoticz.Debug("Imported/Updated icons from "  + importfile)
+                Domoticz.Debug("ImportImages Imported/Updated icons from "  + importfile)
             except:
-                Domoticz.Log("ERROR can not import icons from "  + importfile)
+                MyStatus = 0
+                Domoticz.Log("ImportImages ERROR can not import icons from "  + importfile)
 
-        ImageDictionary=GetImageDictionary(LocalHostInfo)
+        if (MyStatus == 1) : 
+            ImageDictionary=GetImageDictionary()
+            Domoticz.Debug('ImportImages Oke')
 
-        Domoticz.Debug('ImportImages: '+str(ImageDictionary))
-         
+    return MyStatus
+
+# --------------------------------------------------------------------------------------------------------------------------------------------------------
+
+def GetDomoticzIP():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------  Device Creation Routines  ------------------------------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -544,7 +598,7 @@ def CreateDevices():
 
             if DeviceLibrary[Device]['Type'] == 'Room' :
                 Domoticz.Debug('Create Room: '+DeviceLibrary[Device]['Name'])
-                RoomIDX = CreateRoom(LocalHostInfo,DeviceLibrary[Device]['Name'])
+                RoomIDX = CreateRoom(DeviceLibrary[Device]['Name'], False)
                 
 #
 # Add all items to Internet Radio Room
@@ -553,7 +607,7 @@ def CreateDevices():
 
             if DeviceLibrary[Device]['Type'] != 'Room' :
                 Domoticz.Debug('Add Room Item: '+DeviceLibrary[Device]['Name']+' idx: '+str(Devices[DeviceLibrary[Device]['Unit']].ID))
-                AddToRoom(LocalHostInfo,RoomIDX,Devices[DeviceLibrary[Device]['Unit']].ID)
+                AddToRoom(RoomIDX,Devices[DeviceLibrary[Device]['Unit']].ID)
 #
 # Make sure there is no mplayer process active
 #                
@@ -563,73 +617,86 @@ def CreateDevices():
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def CreateRoom(HostInfo,RoomName):
-#
-# HostInfo : http(s)://user:pwd@somehost.somewhere:port
-#
-    import json
-    import requests
+# --------------------------------------------------------------------------------------------------------------------------------------------------------
+def CreateRoom(RoomName, Recreate):
+
+    try:
+        import json
+    except:
+        Domoticz.Log("python3 is missing module json")
+        
+    try:
+        import requests
+    except:
+        Domoticz.Log("python3 is missing module requests")
     
     idx=0
 
     try:
 
-        username=HostInfo.split(':')[1][2:]
-        password=HostInfo.split(':')[2].split('@')[0]
-
-        Domoticz.Debug('Find Room')
+        Domoticz.Debug('Check if Room Exists')
         
-        url=HostInfo.split(':')[0]+'://'+HostInfo.split('@')[1]+'/json.htm?type=plans&order=name&used=true'
-        response=requests.get(url, auth=(username, password))
+        url=LocalHostInfo+'/json.htm?type=command&param=getplans&order=name&used=true'
+        Domoticz.Debug('Check Room '+url)
+        response=requests.get(url, verify=False)
+#        response=requests.get(url)
         data = json.loads(response.text)
+
         if 'result' in data.keys():
             for Item in data['result']:
                 if str(Item['Name']) == RoomName:
                     idx=int(Item['idx'])
+                    Domoticz.Debug('Found Room '+RoomName+' with idx '+str(idx))
 
-        if idx != 0 :
-            Domoticz.Debug('Delete Room')
-            url=HostInfo.split(':')[0]+'://'+HostInfo.split('@')[1]+'/json.htm?idx='+str(idx)+'&param=deleteplan&type=command'
-            response=requests.get(url, auth=(username, password))
-
-        Domoticz.Debug('Create Room')
+        if (idx != 0) and Recreate :
+            url=LocalHostInfo+'/json.htm?idx='+str(idx)+'&param=deleteplan&type=command'
+            Domoticz.Log('Delete Room '+url)
+            response=requests.get(url, verify=False)
+#            response=requests.get(url)
+            idx = 0
         
-        url=HostInfo.split(':')[0]+'://'+HostInfo.split('@')[1]+'/json.htm?name='+RoomName+'&param=addplan&type=command'
-        response=requests.get(url, auth=(username, password))
-        data = json.loads(response.text)
-        idx=int(data['idx'])
-
+        if idx == 0 :
+            url=LocalHostInfo+'/json.htm?name='+RoomName+'&param=addplan&type=command'
+            Domoticz.Log('Create Room '+url)
+            response=requests.get(url, verify=False)
+#            response=requests.get(url)
+            data = json.loads(response.text)
+            Domoticz.Log('CreateRoom Created Room'+str(data))
+            idx=int(data['idx'])
     except:
-        idx=-1
+        Domoticz.Log('ERROR CreateRoom Failed')
+        idx=0
+
+    Domoticz.Debug('CreateRoom status should not be 0 : '+str(idx))
     
     return idx
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
-
-def AddToRoom(HostInfo,RoomIDX,ItemIDX):
-#
-# HostInfo : http(s)://user:pwd@somehost.somewhere:port
-#
-    import json
-    import requests
-    
-    idx=0
+def AddToRoom(RoomIDX,ItemIDX):
 
     try:
-
-        username=HostInfo.split(':')[1][2:]
-        password=HostInfo.split(':')[2].split('@')[0]
-
-        Domoticz.Debug('Add Item To Room')
-        
-        url=HostInfo.split(':')[0]+'://'+HostInfo.split('@')[1]+'/json.htm?activeidx='+str(ItemIDX)+'&activetype=0&idx='+str(RoomIDX)+'&param=addplanactivedevice&type=command'
-
-        response=requests.get(url, auth=(username, password))
-        data = json.loads(response.text)
-
+        import json
     except:
-        idx=-1
+        Domoticz.Log("python3 is missing module json")
+        
+    try:
+        import requests
+    except:
+        Domoticz.Log("python3 is missing module requests")
+    
+    status=1
 
-    return idx
+    try:
+        url=LocalHostInfo+'/json.htm?activeidx='+str(ItemIDX)+'&activetype=0&idx='+str(RoomIDX)+'&param=addplanactivedevice&type=command'
+        response=requests.get(url, verify=False)
+#        response=requests.get(url)
+        data = json.loads(response.text)
+    except:
+        Domoticz.Log('ERROR AddRoom Failed')
+        status=0
+
+    Domoticz.Debug('AddToRoom status should not be 0 : '+str(status))
+    
+    return status
     
 # --------------------------------------------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------  Hardware Routines --------------------------------------------------------------------------------

@@ -4,13 +4,11 @@ It is a configurable Internet Radio and is already preconfigured in internetradi
 
 The plugin can be used to play radio stations from the web browser with which you access your Domoticz.
 
-So music etc. will come out of your phone, tablet, PC ....
+I have it running on a Raspberry 4 with bullseyse, Domoticz 2024.1 and it works with Bluetooth and also with a JACK connection. I did not test with HDMI.
 
-When installed on a Raspberry Pi it will also play on the (bluetooth) speaker connected to the Raspberry Pi.
+Remember that when you use it over the Internet while away from home, and you have a speaker connected to your Pi, your Pi will produce the same music although you are not at home.
 
-Remember that when you use it over the internet while away from home, and you have a speaker connected to your Pi your Pi will produce the same music although you are not at home.
-
-Something I can not do with my Sonos.... 
+Remote control, something I can not do with my Sonos.... 
 
 Okay so now you know it is "better than Sonos" you want it, but how do you get it in place ?
 
@@ -24,6 +22,8 @@ There are a few requirements you need to have in place first.
     ( When already installed it will skip installation and explain it is already installed )
     When you do/can not install mplayer it wil still play radio in the browser on your phone / pc
 
+To test your speaker you may use the next command : speaker-test -c1 -twav -l5
+
 To install the plugin you need to get the contents in your plugin folder :
 
 On a Raspberry Pi you could :
@@ -31,12 +31,6 @@ On a Raspberry Pi you could :
 Start a terminal and go to your plugins folder and the next will get it for you into an internetradio folder : 
 
  ....../plugins$ git clone https://github.com/JackV2020/Domoticz-InternetRadio.git internetradio
-
-later when you want to check for updates you go into the folder and issue git pull :
-
- ....../plugins/internetradio$ git pull
-
-An update will overwrite the configuration file internetradio.conf with a default one so make sure to have a backup of yours.
 
 To get it into Domoticz restart your domoticz like :
 
