@@ -719,7 +719,7 @@ def player(action, device='', what=''):
         command='su -c - pi amixer | grep "%" | head -1 | cut -d "[" -f 2 | cut -d "%" -f 1'
     elif action == 'stop':
         command ='killall mplayer'
-    Domoticz.Log("player command : "+command)
+#    Domoticz.Log("player command : "+command)
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         if action in ['getdevice', 'getvolume']:
